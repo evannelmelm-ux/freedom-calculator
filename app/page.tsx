@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 type RiskProfile = "prudent" | "balanced" | "dynamic";
 
@@ -267,14 +267,14 @@ function getDiagnosis(
   }
 
   if (savingsRate < LOW_SAVINGS_THRESHOLD) {
-    return "Votre taux d'épargne est faible. À ce rythme, votre horizon d'indépendance financière reste lointain. Une augmentation progressive de votre capacité d'investissement pourrait réduire significativement ce délai.";
+    return "Votre effort d'investissement est trop faible par rapport à vos revenus. Avec moins de 10 % de votre revenu net investi chaque mois, votre horizon d'indépendance reste très lointain.";
   }
 
   if (savingsRate <= HIGH_SAVINGS_THRESHOLD) {
-    return "Vous construisez votre patrimoine à un rythme cohérent. Une légère augmentation de votre investissement mensuel pourrait avoir un impact important sur votre date d'indépendance.";
+    return "Votre trajectoire est correcte, mais perfectible. Investir un peu plus chaque mois pourrait avancer sensiblement votre date d'indépendance.";
   }
 
-  return "Excellent taux d'épargne. Vous investissez déjà davantage que la majorité des particuliers. Les intérêts composés devraient accélérer fortement votre progression au fil des années.";
+  return "Votre taux d'épargne est très solide. Vous êtes déjà dans une dynamique favorable — maintenez la régularité pour laisser les intérêts composés faire leur effet.";
 }
 
 function computeResults(form: FormState, currentYear: number) {
@@ -346,8 +346,15 @@ function computeResults(form: FormState, currentYear: number) {
   return {
     savingsRate,
     targetCapital,
+    desiredPassiveIncome: form.desiredPassiveIncome,
+    riskProfileLabel: RISK_PROFILES[form.riskProfile].label,
+    annualReturn: annualReturn,
     independenceYear: base.independenceYear,
     yearsRemaining,
+    independenceAge:
+      base.independenceYear !== null
+        ? form.currentAge + (base.independenceYear - currentYear)
+        : null,
     diagnosis,
     improvementSummary: improvement.summary,
     improvementYearsSavedPhrase: improvement.yearsSavedPhrase,
@@ -440,6 +447,7 @@ function ResultCard({
 }
 
 export default function Home() {
+  const formSectionRef = useRef<HTMLElement>(null);
   const [form, setForm] = useState<FormFields>(DEFAULT_FORM);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -475,6 +483,10 @@ export default function Home() {
     setSubmittedForm(parsed);
   };
 
+  const scrollToForm = () => {
+    formSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const results = useMemo(() => {
     if (!submittedForm) return null;
     return computeResults(submittedForm, currentYear);
@@ -508,7 +520,11 @@ export default function Home() {
         </header>
 
         <div className="grid gap-8 lg:grid-cols-2 lg:gap-10">
-          <section className="rounded-3xl border border-zinc-800/80 bg-zinc-900/40 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8">
+          <section
+            ref={formSectionRef}
+            id="calculator-form"
+            className="scroll-mt-8 rounded-3xl border border-zinc-800/80 bg-zinc-900/40 p-6 shadow-2xl shadow-black/20 backdrop-blur sm:p-8"
+          >
             <h2 className="mb-6 text-lg font-semibold text-zinc-100">
               Vos paramètres
             </h2>
@@ -631,37 +647,72 @@ export default function Home() {
                 Résultats
               </h2>
 
-              <div className="grid gap-4 sm:grid-cols-2">
-                <ResultCard
-                  label="Temps restant avant l'objectif"
-                  value={
-                    results.yearsRemaining !== null
-                      ? `${results.yearsRemaining} an${results.yearsRemaining > 1 ? "s" : ""}`
-                      : "Hors horizon"
-                  }
-                  highlight
-                />
-                <ResultCard
-                  label="Année estimée d'atteinte"
-                  value={
-                    results.independenceYear !== null
-                      ? String(results.independenceYear)
-                      : "Hors horizon"
-                  }
-                />
-                <ResultCard
-                  label="Âge estimé à l'indépendance"
-                  value={
-                    results.independenceYear !== null
-                      ? `${results.currentAge + (results.independenceYear - currentYear)} ans`
-                      : "—"
-                  }
-                />
-                <ResultCard
-                  label="Capital cible"
-                  value={formatEuro(results.targetCapital)}
-                  note="Montant estimé nécessaire pour générer votre revenu passif cible selon la règle des 4 %."
-                />
+              <div className="mb-6 rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/15 to-emerald-500/5 p-6">
+                {results.yearsRemaining === null ? (
+                  <p className="text-2xl font-bold tracking-tight text-emerald-400">
+                    Objectif hors de portée sur l&apos;horizon simulé
+                  </p>
+                ) : results.yearsRemaining <= 0 ? (
+                  <>
+                    <p className="text-2xl font-bold tracking-tight text-emerald-400">
+                      Objectif déjà atteint
+                    </p>
+                    {results.independenceYear !== null && (
+                      <div className="mt-3 space-y-1 text-sm text-zinc-300">
+                        <p>Année estimée : {results.independenceYear}</p>
+                        {results.independenceAge !== null && (
+                          <p>Âge estimé : {results.independenceAge} ans</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold tracking-tight text-emerald-400">
+                      Objectif atteint dans environ {results.yearsRemaining}{" "}
+                      an{results.yearsRemaining > 1 ? "s" : ""}
+                    </p>
+                    {results.independenceYear !== null && (
+                      <div className="mt-3 space-y-1 text-sm text-zinc-300">
+                        <p>Année estimée : {results.independenceYear}</p>
+                        {results.independenceAge !== null && (
+                          <p>Âge estimé : {results.independenceAge} ans</p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <ResultCard
+                label="Capital cible"
+                value={formatEuro(results.targetCapital)}
+                note="Montant estimé nécessaire pour générer votre revenu passif cible selon la règle des 4 %."
+              />
+
+              <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">
+                  Lecture du résultat
+                </p>
+                <ul className="mt-3 space-y-2.5 text-sm leading-relaxed text-zinc-400">
+                  <li>
+                    Le capital cible ({formatEuro(results.targetCapital)})
+                    correspond au patrimoine estimé nécessaire pour retirer{" "}
+                    {formatEuro(results.desiredPassiveIncome)} par mois, selon
+                    la règle des 4&nbsp;%.
+                  </li>
+                  <li>
+                    Cette projection repose sur un rendement annuel de{" "}
+                    {formatPercent(results.annualReturn)} (profil{" "}
+                    {results.riskProfileLabel}). Les marchés fluctuent&nbsp;:
+                    ce rendement n&apos;est ni garanti ni constant.
+                  </li>
+                  <li>
+                    L&apos;inflation (2&nbsp;% par an) et la flat tax
+                    (30&nbsp;% sur les plus-values) sont intégrées de façon
+                    simplifiée pour donner un ordre de grandeur.
+                  </li>
+                </ul>
               </div>
 
               <div className="mt-6 space-y-4">
@@ -718,6 +769,14 @@ export default function Home() {
                   )}
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={scrollToForm}
+                className="mt-6 w-full rounded-xl border border-zinc-700/80 bg-zinc-900/60 px-6 py-3 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800/80 focus:outline-none focus:ring-2 focus:ring-zinc-600 focus:ring-offset-2 focus:ring-offset-zinc-900"
+              >
+                Modifier mes données
+              </button>
             </div>
 
             <aside className="rounded-2xl border border-zinc-800/60 bg-zinc-900/30 p-5">
@@ -737,6 +796,11 @@ export default function Home() {
             )}
           </section>
         </div>
+
+        <footer className="mt-16 border-t border-zinc-800/60 pt-6 text-center text-xs leading-relaxed text-zinc-600">
+          Simulation éducative. Les rendements ne sont pas garantis. Ceci ne
+          constitue pas un conseil financier.
+        </footer>
       </div>
     </div>
   );
