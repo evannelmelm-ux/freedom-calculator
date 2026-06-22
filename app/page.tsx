@@ -116,12 +116,18 @@ type FieldErrors = Partial<Record<keyof FormFields, string>>;
 
 const FIELD_LABELS: Record<keyof FormFields, string> = {
   currentAge: "Âge actuel",
-  currentNetWorth: "Patrimoine net actuel",
+  currentNetWorth: "Patrimoine déjà investi ou prêt à investir",
   monthlyNetIncome: "Revenu net mensuel",
   monthlyExpenses: "Dépenses mensuelles",
   monthlyInvestment: "Investissement mensuel",
-  desiredPassiveIncome: "Revenu passif mensuel souhaité",
+  desiredPassiveIncome:
+    "Combien souhaitez-vous générer chaque mois avec vos placements ?",
   riskProfile: "Profil de risque",
+};
+
+const FIELD_EMPTY_ERRORS: Partial<Record<keyof FormFields, string>> = {
+  desiredPassiveIncome:
+    "Indiquez le montant mensuel que vous souhaitez générer avec vos placements.",
 };
 
 const NUMERIC_FIELDS: (keyof FormFields)[] = [
@@ -172,7 +178,8 @@ function validateForm(fields: FormFields): {
   for (const key of NUMERIC_FIELDS) {
     const value = fields[key].trim();
     if (value === "") {
-      errors[key] = `${FIELD_LABELS[key]} est obligatoire.`;
+      errors[key] =
+        FIELD_EMPTY_ERRORS[key] ?? `${FIELD_LABELS[key]} est obligatoire.`;
       continue;
     }
 
@@ -657,6 +664,7 @@ function NumberField({
   value,
   onChange,
   placeholder,
+  hint,
   error,
   inputMode = "numeric",
 }: {
@@ -665,9 +673,14 @@ function NumberField({
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  hint?: string;
   error?: string;
   inputMode?: "numeric" | "decimal";
 }) {
+  const describedBy = [hint ? `${id}-hint` : null, error ? `${id}-error` : null]
+    .filter(Boolean)
+    .join(" ");
+
   return (
     <label htmlFor={id} className="block space-y-2">
       <span className="text-sm font-medium text-zinc-300">{label}</span>
@@ -679,13 +692,18 @@ function NumberField({
         placeholder={placeholder}
         onChange={(e) => onChange(normalizeNumericInput(e.target.value))}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={describedBy || undefined}
         className={`w-full rounded-xl border bg-zinc-900/80 px-4 py-3 text-zinc-50 placeholder:text-zinc-500 outline-none transition focus:ring-2 ${
           error
             ? "border-red-500/60 focus:border-red-500/60 focus:ring-red-500/20"
             : "border-zinc-700/80 focus:border-emerald-500/60 focus:ring-emerald-500/20"
         }`}
       />
+      {hint && !error && (
+        <p id={`${id}-hint`} className="text-xs leading-relaxed text-zinc-500">
+          {hint}
+        </p>
+      )}
       {error && (
         <p id={`${id}-error`} className="text-xs text-red-400">
           {error}
@@ -829,10 +847,11 @@ export default function Home() {
               />
               <NumberField
                 id="currentNetWorth"
-                label="Patrimoine net actuel"
+                label={FIELD_LABELS.currentNetWorth}
                 value={form.currentNetWorth}
                 onChange={(v) => update("currentNetWorth", v)}
                 placeholder={FIELD_PLACEHOLDERS.currentNetWorth}
+                hint="Incluez uniquement l'argent que vous souhaitez réellement prendre en compte dans cette simulation."
                 error={fieldErrors.currentNetWorth}
               />
               <NumberField
@@ -861,10 +880,11 @@ export default function Home() {
               />
               <NumberField
                 id="desiredPassiveIncome"
-                label="Revenu passif mensuel souhaité"
+                label={FIELD_LABELS.desiredPassiveIncome}
                 value={form.desiredPassiveIncome}
                 onChange={(v) => update("desiredPassiveIncome", v)}
                 placeholder={FIELD_PLACEHOLDERS.desiredPassiveIncome}
+                hint="Exemple : 2 500 € par mois pour couvrir vos dépenses ou compléter vos revenus."
                 error={fieldErrors.desiredPassiveIncome}
               />
             </div>
